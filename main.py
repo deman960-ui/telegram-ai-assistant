@@ -152,20 +152,69 @@ def telegram(method, payload=None):
     return result["result"]
 
 
+
 def telegram_html(text):
-    """Оставляет обычный текст обычным, а fenced code превращает в HTML <pre>."""
-    pattern = re.compile(r"```(?:[a-zA-Z0-9_+-]+)?\s*\n?(.*?)```", re.DOTALL)
+    """Преобразует Markdown-разметку в HTML для Telegram."""
+
+    pattern = re.compile(
+        r"```(?:[a-zA-Z0-9_+-]+)?\s*\n?(.*?)```",
+        re.DOTALL,
+    )
+
+    def format_text(value):
+        value = html.escape(value)
+
+        # **Жирный текст** → <b>Жирный текст</b>
+        value = re.sub(
+            r"\*\*(.+?)\*\*",
+            r"<b>\1</b>",
+            value,
+        )
+
+        # *Курсив* → <i>Курсив</i>
+        value = re.sub(
+            r"(?<!\*)\*([^*\n]+)\*(?!\*)",
+            r"<i>\1</i>",
+            value,
+        )
+
+        # [Название](https://example.com) → кликабельная ссылка
+        value = re.sub(
+            r"\[([^\]]+)\]\((https?://[^)\s]+)\)",
+            r'<a href="\2">\1</a>',
+            value,
+        )
+
+        # Убираем лишние скобки вокруг ссылки
+        value = re.sub(
+            r"\(<a href=",
+            '<a href=',
+            value,
+        )
+        value = re.sub(
+            r'</a>\)',
+            '</a>',
+            value,
+        )
+
+        return value
+
     pieces = []
     position = 0
 
     for match in pattern.finditer(text):
-        pieces.append(html.escape(text[position:match.start()]))
+        ordinary = text[position:match.start()]
+        pieces.append(format_text(ordinary))
+
         code = match.group(1).strip("\n")
         pieces.append("<pre>" + html.escape(code) + "</pre>")
+
         position = match.end()
 
-    pieces.append(html.escape(text[position:]))
+    pieces.append(format_text(text[position:]))
+
     return "".join(pieces)
+
 
 
 def send(chat_id, text, markup=None):
